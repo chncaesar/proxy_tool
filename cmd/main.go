@@ -81,7 +81,6 @@ var systemServices = []ProxyService{
 				}
 				return fmt.Errorf("设置 docker 代理失败: %v", err)
 			}
-
 			return nil
 		},
 		GetProxy: func() (string, error) {
@@ -149,6 +148,85 @@ var userServices = []ProxyService{
 		NeedRestart: false,
 		NeedRoot:    false,
 		Type:        ProxyTypeUser,
+	},
+	{
+		Name: "docker",
+		SetProxy: func(addr string) error {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("获取用户主目录失败: %v", err)
+			}
+			dockerConfigPath := homeDir + "/.docker/config.json"
+			backupPath := dockerConfigPath + ".bak"
+
+			// 准备新的代理配置
+			proxyConfig := map[string]interface{}{
+				"default": map[string]interface{}{
+					"httpProxy":  "http://" + addr,
+					"httpsProxy": "http://" + addr,
+					"noProxy":    "localhost,127.0.0.1",
+				},
+			}
+
+			// 读取现有配置
+			var existingConfig map[string]interface{}
+			if _, err := os.Stat(dockerConfigPath); err == nil {
+				// 备份当前配置
+				currentConfig, err := os.ReadFile(dockerConfigPath)
+				if err != nil {
+					return fmt.Errorf("读取 docker 配置失败: %v", err)
+				}
+				if err := os.WriteFile(backupPath, currentConfig, 0644); err != nil {
+					return fmt.Errorf("备份 docker 配置失败: %v", err)
+				}
+				fmt.Printf("已备份 docker 配置文件到: %s\n", backupPath)
+
+				// 解析现有配置
+				if err := json.Unmarshal(currentConfig, &existingConfig); err != nil {
+					return fmt.Errorf("解析 docker 配置失败: %v", err)
+				}
+			} else {
+				existingConfig = make(map[string]interface{})
+			}
+
+			// 合并配置
+			existingConfig["proxies"] = proxyConfig
+
+			// 将合并后的配置转换为 JSON
+			newConfig, err := json.MarshalIndent(existingConfig, "", "  ")
+			if err != nil {
+				return fmt.Errorf("生成 docker 配置失败: %v", err)
+			}
+
+			// 确保目录存在
+			os.MkdirAll(homeDir+"/.docker", 0755)
+
+			// 写入新配置
+			if err := os.WriteFile(dockerConfigPath, newConfig, 0644); err != nil {
+				// 如果写入失败，尝试恢复备份
+				if _, err := os.Stat(backupPath); err == nil {
+					if backupData, err := os.ReadFile(backupPath); err == nil {
+						os.WriteFile(dockerConfigPath, backupData, 0644)
+					}
+				}
+				return fmt.Errorf("设置 docker 代理失败: %v", err)
+			}
+			return nil
+		},
+		GetProxy: func() (string, error) {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("获取用户主目录失败: %v", err)
+			}
+			dockerConfigPath := homeDir + "/.docker/config.json"
+			data, err := os.ReadFile(dockerConfigPath)
+			if err != nil {
+				return "", fmt.Errorf("读取 docker 配置失败: %v", err)
+			}
+			return fmt.Sprintf("配置文件: %s\n%s", dockerConfigPath, string(data)), nil
+		},
+		NeedRestart: false,
+		NeedRoot:    false,
 	},
 }
 
