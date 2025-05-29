@@ -10,6 +10,8 @@
     - Docker 客户端配置（用户级，~/.docker/config.json）
     - Docker 守护进程配置（系统级，/etc/docker/daemon.json）
   - APT 代理设置（系统级）
+  - 环境变量代理设置（用户级，~/.bashrc, ~/.zshrc, ~/.bash_profile）
+
 - 支持用户级和系统级代理配置
 - 简单的命令行接口
 - 支持查看当前代理设置
@@ -86,6 +88,11 @@ proxy-tool <command> [arguments]
   - 保留现有的认证信息（auths）等配置
 - Git（~/.gitconfig）
   - 配置 Git 的全局代理设置
+- 环境变量（~/.bashrc, ~/.zshrc, ~/.bash_profile）
+  - 配置 http_proxy, https_proxy, all_proxy 环境变量
+  - 自动检测并更新用户使用的 shell 配置文件
+  - 配置后需要重新加载配置文件或重启终端才能生效
+  - 可以使用 `source ~/.bashrc` 或 `source ~/.zshrc` 重新加载配置  
 
 ## 注意事项
 
@@ -93,6 +100,8 @@ proxy-tool <command> [arguments]
 2. 修改 Docker 守护进程配置后需要重启 Docker 服务
 3. 工具会自动备份配置文件，备份文件名为原文件名加上 .bak 后缀
 4. 建议在设置代理前检查相关配置文件的内容
+5. 环境变量代理配置后需要重新加载配置文件或重启终端才能生效
+
 
 ## 测试
 

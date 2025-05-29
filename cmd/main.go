@@ -118,6 +118,118 @@ var systemServices = []ProxyService{
 
 var userServices = []ProxyService{
 	{
+		Name: "env",
+		SetProxy: func(addr string) error {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("获取用户主目录失败: %v", err)
+			}
+			proxyConfig := fmt.Sprintf(`
+# Proxy Tool 配置的环境变量
+export http_proxy="http://%s"
+export https_proxy="http://%s"
+export all_proxy="socks5://%s"
+
+`, addr, addr, addr)
+
+			shellConfigs := []string{
+				homeDir + "/.bashrc",
+				homeDir + "/.zshrc",
+				homeDir + "/.bash_profile",
+			}
+			var configModified bool
+			for _, configFile := range shellConfigs {
+				if _, err := os.Stat(configFile); err != nil {
+					continue
+				}
+				content, err := os.ReadFile(configFile)
+				if err != nil {
+					continue
+				}
+				backupPath := configFile + ".bak"
+				_ = os.WriteFile(backupPath, content, 0644)
+
+				contentStr := string(content)
+				// 使用字符串替换而不是正则表达式
+				marker := "# Proxy Tool 配置的环境变量"
+				if strings.Contains(contentStr, marker) {
+					// 找到标记的位置
+					start := strings.Index(contentStr, marker)
+					// 找到下一个空行的位置
+					end := strings.Index(contentStr[start:], "\n\n")
+					if end == -1 {
+						end = len(contentStr)
+					} else {
+						end = start + end + 2
+					}
+					// 替换配置部分
+					newContent := contentStr[:start] + proxyConfig + contentStr[end:]
+					if err := os.WriteFile(configFile, []byte(newContent), 0644); err != nil {
+						continue
+					}
+				} else {
+					if err := os.WriteFile(configFile, append(content, []byte(proxyConfig)...), 0644); err != nil {
+						continue
+					}
+				}
+				configModified = true
+				fmt.Printf("已更新配置文件: %s\n", configFile)
+			}
+			if !configModified {
+				return fmt.Errorf("未找到任何可用的 shell 配置文件")
+			}
+			fmt.Println("环境变量代理配置已更新，请重新加载配置文件或重启终端以生效")
+			fmt.Println("可以使用以下命令重新加载配置：")
+			fmt.Println("  source ~/.bashrc  # 如果使用 bash")
+			fmt.Println("  source ~/.zshrc   # 如果使用 zsh")
+			return nil
+		},
+		GetProxy: func() (string, error) {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("获取用户主目录失败: %v", err)
+			}
+			shellConfigs := []string{
+				homeDir + "/.bashrc",
+				homeDir + "/.zshrc",
+				homeDir + "/.bash_profile",
+			}
+			var result strings.Builder
+			for _, configFile := range shellConfigs {
+				if _, err := os.Stat(configFile); err != nil {
+					continue
+				}
+				content, err := os.ReadFile(configFile)
+				if err != nil {
+					continue
+				}
+				contentStr := string(content)
+				marker := "# Proxy Tool 配置的环境变量"
+				if strings.Contains(contentStr, marker) {
+					// 找到标记的位置
+					start := strings.Index(contentStr, marker)
+					// 找到下一个空行的位置
+					end := strings.Index(contentStr[start:], "\n\n")
+					if end == -1 {
+						end = len(contentStr)
+					} else {
+						end = start + end + 2
+					}
+					// 提取配置部分
+					config := contentStr[start:end]
+					result.WriteString(fmt.Sprintf("配置文件 %s:\n%s\n", configFile, config))
+				}
+			}
+			if result.Len() == 0 {
+				return "未找到环境变量代理配置", nil
+			}
+			return result.String(), nil
+		},
+		NeedRestart: false,
+		NeedRoot:    false,
+		Type:        ProxyTypeUser,
+	},
+	{
 		Name: "git",
 		SetProxy: func(addr string) error {
 			cmd := exec.Command("git", "config", "--global", "http.proxy", "http://"+addr)
@@ -167,7 +279,6 @@ var userServices = []ProxyService{
 					"noProxy":    "localhost,127.0.0.1",
 				},
 			}
-
 			// 读取现有配置
 			var existingConfig map[string]interface{}
 			if _, err := os.Stat(dockerConfigPath); err == nil {
@@ -197,7 +308,6 @@ var userServices = []ProxyService{
 			if err != nil {
 				return fmt.Errorf("生成 docker 配置失败: %v", err)
 			}
-
 			// 确保目录存在
 			os.MkdirAll(homeDir+"/.docker", 0755)
 
