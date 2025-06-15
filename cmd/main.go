@@ -118,6 +118,107 @@ var systemServices = []ProxyService{
 
 var userServices = []ProxyService{
 	{
+		Name: "npm",
+		SetProxy: func(addr string) error {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("获取用户主目录失败: %v", err)
+			}
+			npmrcPath := homeDir + "/.npmrc"
+			backupPath := npmrcPath + ".bak"
+
+			// 准备新的代理配置
+			proxyConfig := fmt.Sprintf(`# Proxy Tool 配置的 npm 代理
+	proxy=http://%s
+	https-proxy=http://%s
+	`, addr, addr)
+
+			// 读取现有配置
+			var existingContent string
+			if _, err := os.Stat(npmrcPath); err == nil {
+				// 备份当前配置
+				currentConfig, err := os.ReadFile(npmrcPath)
+				if err != nil {
+					return fmt.Errorf("读取 npm 配置失败: %v", err)
+				}
+				if err := os.WriteFile(backupPath, currentConfig, 0644); err != nil {
+					return fmt.Errorf("备份 npm 配置失败: %v", err)
+				}
+				fmt.Printf("已备份 npm 配置文件到: %s\n", backupPath)
+
+				existingContent = string(currentConfig)
+			}
+
+			// 处理现有配置
+			var newContent string
+			if existingContent != "" {
+				// 使用字符串替换而不是正则表达式
+				marker := "# Proxy Tool 配置的 npm 代理"
+				if strings.Contains(existingContent, marker) {
+					// 找到标记的位置
+					start := strings.Index(existingContent, marker)
+					// 找到下一个空行的位置
+					end := strings.Index(existingContent[start:], "\n\n")
+					if end == -1 {
+						end = len(existingContent)
+					} else {
+						end = start + end + 2
+					}
+					// 替换配置部分
+					newContent = existingContent[:start] + proxyConfig + existingContent[end:]
+				} else {
+					newContent = existingContent + "\n" + proxyConfig
+				}
+			} else {
+				newContent = proxyConfig
+			}
+
+			// 写入新配置
+			if err := os.WriteFile(npmrcPath, []byte(newContent), 0644); err != nil {
+				// 如果写入失败，尝试恢复备份
+				if _, err := os.Stat(backupPath); err == nil {
+					if backupData, err := os.ReadFile(backupPath); err == nil {
+						os.WriteFile(npmrcPath, backupData, 0644)
+					}
+				}
+				return fmt.Errorf("设置 npm 代理失败: %v", err)
+			}
+			return nil
+		},
+		GetProxy: func() (string, error) {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return "", fmt.Errorf("获取用户主目录失败: %v", err)
+			}
+			npmrcPath := homeDir + "/.npmrc"
+			if _, err := os.Stat(npmrcPath); err != nil {
+				return "未找到 npm 配置文件", nil
+			}
+			data, err := os.ReadFile(npmrcPath)
+			if err != nil {
+				return "", fmt.Errorf("读取 npm 配置失败: %v", err)
+			}
+			content := string(data)
+			marker := "# Proxy Tool 配置的 npm 代理"
+			if !strings.Contains(content, marker) {
+				return "未找到 npm 代理配置", nil
+			}
+			// 找到标记的位置
+			start := strings.Index(content, marker)
+			// 找到下一个空行的位置
+			end := strings.Index(content[start:], "\n\n")
+			if end == -1 {
+				end = len(content)
+			} else {
+				end = start + end + 2
+			}
+			return fmt.Sprintf("配置文件: %s\n%s", npmrcPath, content[start:end]), nil
+		},
+		NeedRestart: false,
+		NeedRoot:    false,
+		Type:        ProxyTypeUser,
+	},
+	{
 		Name: "env",
 		SetProxy: func(addr string) error {
 			homeDir, err := os.UserHomeDir()
