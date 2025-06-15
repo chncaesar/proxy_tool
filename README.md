@@ -92,7 +92,11 @@ proxy-tool <command> [arguments]
   - 配置 http_proxy, https_proxy, all_proxy 环境变量
   - 自动检测并更新用户使用的 shell 配置文件
   - 配置后需要重新加载配置文件或重启终端才能生效
-  - 可以使用 `source ~/.bashrc` 或 `source ~/.zshrc` 重新加载配置  
+  - 可以使用 `source ~/.bashrc` 或 `source ~/.zshrc` 重新加载配置
+- NPM（~/.npmrc）
+  - 配置 NPM 的代理设置
+  - 同时设置 http 和 https 代理
+  - 保留其他 NPM 配置  
 
 ## 注意事项
 
