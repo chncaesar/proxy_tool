@@ -3,7 +3,7 @@
 set -e
 
 # 版本信息
-VERSION="0.1.0"
+VERSION="0.1.5"
 BUILD_TIME=$(date "+%F %T")
 LDFLAGS="-X 'main.Version=${VERSION}' -X 'main.BuildTime=${BUILD_TIME}'"
 

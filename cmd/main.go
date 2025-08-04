@@ -230,8 +230,10 @@ var userServices = []ProxyService{
 export http_proxy="http://%s"
 export https_proxy="http://%s"
 export all_proxy="socks5://%s"
+export HTTP_PROXY="http://%s"
+export HTTPS_PROXY="http://%s"
 
-`, addr, addr, addr)
+`, addr, addr, addr, addr, addr)
 
 			shellConfigs := []string{
 				homeDir + "/.bashrc",
@@ -314,7 +316,7 @@ export all_proxy="socks5://%s"
 					if end == -1 {
 						end = len(contentStr)
 					} else {
-						end = start + end + 2
+						end = start + end + 4
 					}
 					// 提取配置部分
 					config := contentStr[start:end]
